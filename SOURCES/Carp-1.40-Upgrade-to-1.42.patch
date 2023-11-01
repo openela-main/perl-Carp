@@ -1,0 +1,128 @@
+From 7cdc0cd3cf5f9fd6459daa746db8f647c14ef9fe Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Petr=20P=C3=ADsa=C5=99?= <ppisar@redhat.com>
+Date: Thu, 11 May 2017 08:43:33 +0200
+Subject: [PATCH] Upgrade to 1.42
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Unbundled from perl-5.25.12.
+
+Signed-off-by: Petr Písař <ppisar@redhat.com>
+---
+ lib/Carp.pm       |  6 +++---
+ lib/Carp/Heavy.pm |  2 +-
+ t/Carp.t          | 13 ++++++++++++-
+ t/arg_string.t    | 10 +++++++++-
+ 4 files changed, 25 insertions(+), 6 deletions(-)
+
+diff --git a/lib/Carp.pm b/lib/Carp.pm
+index 92f8866..05052b9 100644
+--- a/lib/Carp.pm
++++ b/lib/Carp.pm
+@@ -87,7 +87,7 @@ BEGIN {
+     }
+ }
+ 
+-our $VERSION = '1.40';
++our $VERSION = '1.42';
+ $VERSION =~ tr/_//d;
+ 
+ our $MaxEvalLen = 0;
+@@ -474,7 +474,7 @@ sub ret_backtrace {
+         eval {
+             CORE::die;
+         };
+-        if($@ =~ /^Died at .*(, <.*?> line \d+).$/ ) {
++        if($@ =~ /^Died at .*(, <.*?> (?:line|chunk) \d+).$/ ) {
+             $mess .= $1;
+         }
+     }
+@@ -636,7 +636,7 @@ Carp - alternative warn and die for modules
+ 
+     # cluck, longmess and shortmess not exported by default
+     use Carp qw(cluck longmess shortmess);
+-    cluck "This is how we got here!";
++    cluck "This is how we got here!"; # warn with stack backtrace
+     $long_message   = longmess( "message from cluck() or confess()" );
+     $short_message  = shortmess( "message from carp() or croak()" );
+ 
+diff --git a/lib/Carp/Heavy.pm b/lib/Carp/Heavy.pm
+index b05d758..f9c584a 100644
+--- a/lib/Carp/Heavy.pm
++++ b/lib/Carp/Heavy.pm
+@@ -2,7 +2,7 @@ package Carp::Heavy;
+ 
+ use Carp ();
+ 
+-our $VERSION = '1.40';
++our $VERSION = '1.42';
+ $VERSION =~ tr/_//d;
+ 
+ # Carp::Heavy was merged into Carp in version 1.12.  Any mismatched versions
+diff --git a/t/Carp.t b/t/Carp.t
+index 9ecdf88..65daed7 100644
+--- a/t/Carp.t
++++ b/t/Carp.t
+@@ -3,7 +3,7 @@ no warnings "once";
+ use Config;
+ 
+ use IPC::Open3 1.0103 qw(open3);
+-use Test::More tests => 66;
++use Test::More tests => 67;
+ 
+ sub runperl {
+     my(%args) = @_;
+@@ -442,6 +442,16 @@ $@ =~ s/\n.*//; # just check first line
+ is $@, "heek at ".__FILE__." line ".(__LINE__-2).", <DATA> line 2.\n",
+     'last handle line num is mentioned';
+ 
++# [cpan #100183]
++{
++    local $/ = \6;
++    <XD::DATA>;
++    eval { croak 'jeek' };
++    $@ =~ s/\n.*//; # just check first line
++    is $@, "jeek at ".__FILE__." line ".(__LINE__-2).", <DATA> chunk 3.\n",
++        'last handle chunk num is mentioned';
++}
++
+ SKIP:
+ {
+     skip "IPC::Open3::open3 needs porting", 1 if $Is_VMS;
+@@ -531,3 +541,4 @@ __DATA__
+ 1
+ 2
+ 3
++abcdefghijklmnopqrstuvwxyz
+diff --git a/t/arg_string.t b/t/arg_string.t
+index dbd2e6e..dc70f43 100644
+--- a/t/arg_string.t
++++ b/t/arg_string.t
+@@ -1,6 +1,8 @@
+ use warnings;
+ use strict;
+ 
++# confirm that stack args are displayed correctly by longmess()
++
+ use Test::More tests => 32;
+ 
+ use Carp ();
+@@ -22,7 +24,13 @@ like lm(3), qr/main::lm\(3\)/;
+ like lm(substr("3\x{2603}", 0, 1)), qr/main::lm\(3\)/;
+ like lm(-3), qr/main::lm\(-3\)/;
+ like lm(-3.5), qr/main::lm\(-3\.5\)/;
+-like lm(-3.5e100), qr/main::lm\(-3\.5[eE]\+?100\)/;
++like lm(-3.5e30),
++            qr/main::lm\(
++              (
++                -3500000000000000000000000000000
++              | -3\.5[eE]\+?0?30
++              )
++              \) /x;
+ like lm(""), qr/main::lm\(""\)/;
+ like lm("foo"), qr/main::lm\("foo"\)/;
+ like lm("a\$b\@c\\d\"e"), qr/main::lm\("a\\\$b\\\@c\\\\d\\\"e"\)/;
+-- 
+2.9.3
+
